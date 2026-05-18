@@ -2,7 +2,7 @@
   "name": "music-recommender",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://gabrielpow.github.io/music-recommender",
+  "homepage": "https://gabrielpow.github.io/Projeto-ML",
   "type": "module",
   "scripts": {
     "dev": "vite",
