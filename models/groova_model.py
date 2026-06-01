@@ -114,7 +114,9 @@ print('df_recommender Shape:', df_recommender.shape)
 df_recommender.head(3)
 
 # --- PIPELINE-A ESTILO ---
-
+'''
+Pipeline A de Estilo
+'''
 def map_features(df_recommender):
     estilo_group_map = {
         'Sertanejo': 'Música Brasileira Popular',
@@ -203,5 +205,16 @@ df_recommender_a.to_csv(os.path.join(INTERIM_DIR, 'df_recommender_a_with_lda.csv
 print('Pipeline A with LDA feature output shape:', df_recommender_a.shape)
 
 # --- PIPELINE-B GRUPOS SONOROS ---
+'''
+Pipeline-B Grupos Sonoros
+'''
 
 # --- TREINAR MODELO ---
+'''
+Treinar dois modelos, um para focar no estilo, outro para focar nos grupos sonoros. Adicionalmente treinar dados sobre as bandas mainstream
+'''
+
+# --- MAINSTREAM RECOMMENDATION ---
+'''
+Depois de treinar modelos, verificar a porcentagem de similaridade de estilo e grupo sonoro com as bandas mainstream
+'''
