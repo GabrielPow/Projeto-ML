@@ -2,6 +2,9 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -171,12 +174,16 @@ def fit_lda_features(df, target_column='estilo'):
     df = df.copy()
     y = df[target_column].astype(str).fillna('missing').astype('category')
     X = df.drop(columns=[target_column], errors='ignore')
+    X = df.drop(columns=['SLUG'])
     df_id = df['ID_ARTISTA']
-    if 'ID_ARTISTA' in X.columns:
-        X = X.drop(columns=['ID_ARTISTA'])
+    X = X.drop(columns=['ID_ARTISTA'])
 
-    numeric_cols = X.select_dtypes(include=['number']).columns.tolist()
-    categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
+    X_style = X.copy()
+    y_style = y.str.strip().replace({'': 'missing', 'nan': 'missing'})
+    y_style = y_style.fillna('missing').astype('category')
+
+    numeric_cols = X_style.select_dtypes(include=['number']).columns.tolist()
+    categorical_cols = X_style.select_dtypes(include=['object', 'category']).columns.tolist()
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -191,16 +198,23 @@ def fit_lda_features(df, target_column='estilo'):
         ('lda', LinearDiscriminantAnalysis(solver='svd'))
     ])
 
-    lda_pipeline.fit(X, y)
-    X_lda = lda_pipeline.transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_style, 
+        y_style, 
+        test_size=0.2, 
+        random_state=42, 
+        stratify=y_style)
+
+    lda_pipeline.fit(X_train, y_train)
+    X_lda = lda_pipeline.transform(X_style)
     component_names = [f'lda_component_{i+1}' for i in range(X_lda.shape[1])]
     df_lda = pd.DataFrame(X_lda, columns=component_names, index=df.index)
 
     df_with_id = pd.concat([df_id,df_lda], axis=1)
-    return df_with_id, lda_pipeline
+    return df_with_id, lda_pipeline, X_train, y_train, X_test, y_test
 
 df_recommender_a = map_features(df_recommender)
-df_recommender_a, lda_pipeline_a = fit_lda_features(df_recommender_a)
+df_recommender_a, lda_pipeline_a, X_train, y_train, X_test, y_test = fit_lda_features(df_recommender_a)
 df_recommender_a.to_csv(os.path.join(INTERIM_DIR, 'df_recommender_a_with_lda.csv'), index=False)
 print('Pipeline A with LDA feature output shape:', df_recommender_a.shape)
 
@@ -214,7 +228,53 @@ Pipeline-B Grupos Sonoros
 Treinar dois modelos, um para focar no estilo, outro para focar nos grupos sonoros. Adicionalmente treinar dados sobre as bandas mainstream
 '''
 
+def train_gradient_boost_style(lda_pipeline_a, X_train, y_train, X_test, y_test):
+    
+    X_train_style_lda = lda_pipeline_a.transform(X_train)
+    X_test_style_lda = lda_pipeline_a.transform(X_test)
+
+    gb_pipeline_style = Pipeline([
+        ('scaler', StandardScaler()),
+        ('gb', GradientBoostingClassifier(
+            n_estimators=200,
+            learning_rate=0.1,
+            max_depth=3,
+            random_state=42
+        ))
+    ])
+
+    print('Treinando Gradient Boosting no espaço LDA para Estilo...')
+    gb_pipeline_style.fit(X_train_style_lda, y_train)
+    print('Gradient Boosting treinado com sucesso!')
+
+    y_pred_style_gb = gb_pipeline_style.predict(X_test_style_lda)
+    print('\nRelatório de classificação - Gradient Boosting em Estilo:')
+    print(classification_report(y_test, y_pred_style_gb, zero_division=0))
+
+    cm_style_gb = confusion_matrix(y_test, y_pred_style_gb)
+    print('Matriz de confusão calculada.')
+
+    return {
+        'gb_pipeline': gb_pipeline_style,
+        'X_train': X_train,
+        'X_test': X_test,
+        'y_train': y_train,
+        'y_test': y_test,
+        'y_pred': y_pred_style_gb,
+        'confusion_matrix': cm_style_gb
+    }
+
+
+def run_estilo():
+    df_reco_estilo = map_features(df_recommender)
+    _, lda_pipeline_a, X_train, y_train, X_test, y_test = fit_lda_features(df_reco_estilo)
+    training_results = train_gradient_boost_style(lda_pipeline_a, X_train, y_train,X_test, y_test)
+    return training_results
+
+
+
 # --- MAINSTREAM RECOMMENDATION ---
 '''
 Depois de treinar modelos, verificar a porcentagem de similaridade de estilo e grupo sonoro com as bandas mainstream
 '''
+
