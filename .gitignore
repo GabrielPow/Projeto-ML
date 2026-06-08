@@ -1,5 +1,34 @@
+# Ambientes virtuais
 .venv/
+venv/
+env/
+
+# Python
 __pycache__/
 *.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
 .ipynb_checkpoints/
+
+# Editores / IDEs
+.vscode/
+.idea/
+
+# Ferramentas (Claude Code)
+.claude/
+
+# Sistema operacional
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# Dados (reproduziveis por codigo - configs/get_dfMain.py e models/train.py)
+data/raw/
+data/processed/
+
+# Imagens soltas na raiz (prints colados por engano)
+/image*.png
+*.png
