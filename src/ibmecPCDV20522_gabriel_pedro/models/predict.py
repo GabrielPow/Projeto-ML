@@ -6,13 +6,20 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 DATA_DIR = ROOT_DIR / 'data'
-PROCESSED_PATH = DATA_DIR / 'processed' / 'df_recommender.csv'
-LDA_PATH = DATA_DIR / 'interim' / 'df_recommender_a_with_lda.csv'
+# Tabela unica ja mergeada por data/make_dataset.py (recommender + LDA + familia).
+FINAL_PATH = DATA_DIR / 'processed' / 'df_final.csv'
+
+# Prefixos das colunas que formam o embedding de similaridade. Centralizado
+# aqui de proposito: para incluir novas features no calculo (ex.: similaridade
+# com bandas mainstream), basta adicionar o prefixo nesta tupla -- nada mais
+# no arquivo precisa mudar.
+EMBEDDING_PREFIXES = ('lda_component_', 'proba_')
 
 STYLE_GROUP_MAP = {
     'Sertanejo': 'Música Brasileira Popular',
@@ -59,31 +66,27 @@ def _normalize_text(value: object) -> str:
 
 @lru_cache(maxsize=1)
 def load_catalog() -> tuple[pd.DataFrame, list[str], np.ndarray]:
-    if not PROCESSED_PATH.exists():
-        raise FileNotFoundError(f'Arquivo não encontrado: {PROCESSED_PATH}')
+    if not FINAL_PATH.exists():
+        raise FileNotFoundError(
+            f'Arquivo não encontrado: {FINAL_PATH}. '
+            'Rode antes: python -m ibmecPCDV20522_gabriel_pedro.data.make_dataset'
+        )
 
-    if not LDA_PATH.exists():
-        raise FileNotFoundError(f'Arquivo não encontrado: {LDA_PATH}')
-
-    df_recommender = pd.read_csv(PROCESSED_PATH)
-    df_lda = pd.read_csv(LDA_PATH)
-
-    catalog = df_recommender.merge(df_lda, on='ID_ARTISTA', how='inner')
-    catalog = catalog.reset_index(drop=True)
+    catalog = pd.read_csv(FINAL_PATH).reset_index(drop=True)
     catalog['style_group'] = catalog['estilo'].map(STYLE_GROUP_MAP).fillna('Cover / Tributo & Outros')
 
-    lda_columns = [column for column in catalog.columns if column.startswith('lda_component_')]
-    if not lda_columns:
-        raise ValueError('Os componentes LDA não foram encontrados no catálogo.')
+    embedding_columns = [column for column in catalog.columns if column.startswith(EMBEDDING_PREFIXES)]
+    if not embedding_columns:
+        raise ValueError('Nenhuma coluna de embedding encontrada no catálogo (LDA / família sonora).')
 
-    embeddings = catalog[lda_columns].apply(pd.to_numeric, errors='coerce').fillna(0.0).to_numpy(dtype=float)
+    embeddings = catalog[embedding_columns].apply(pd.to_numeric, errors='coerce').fillna(0.0).to_numpy(dtype=float)
     embeddings = StandardScaler().fit_transform(embeddings)
 
     catalog['artist_name_normalized'] = catalog['artist_name'].map(_normalize_text)
     catalog['video_title_normalized'] = catalog['video_title'].map(_normalize_text)
     catalog['slug_normalized'] = catalog['SLUG'].map(_normalize_text)
 
-    return catalog, lda_columns, embeddings
+    return catalog, embedding_columns, embeddings
 
 
 def search_artists(query: str, limit: int = 6) -> list[dict[str, object]]:
@@ -204,8 +207,9 @@ def _score_candidates(
     min_note: float | None,
     top_k: int,
 ) -> dict[str, object]:
-    matched_vector = embeddings[matched_index]
-    distances = np.linalg.norm(embeddings - matched_vector, axis=1)
+    matched_vector = embeddings[matched_index].reshape(1, -1)
+    similarities = cosine_similarity(embeddings, matched_vector).ravel()
+    distances = 1.0 - similarities  # distância de cosseno: 0 = idêntico, 2 = oposto
 
     candidate_mask = np.ones(len(catalog), dtype=bool)
     candidate_mask[matched_index] = False
@@ -274,6 +278,7 @@ def _artist_detail(row: pd.Series) -> dict[str, object]:
     detail.update(
         {
             'style_group': row['style_group'],
+            'familia_sonora': row['familia_sonora'] if 'familia_sonora' in row and pd.notna(row['familia_sonora']) else None,
             'formation': row['FORMACAO'],
             'song': row['video_title'],
             'note': float(row['Nota']) if pd.notna(row['Nota']) else None,
