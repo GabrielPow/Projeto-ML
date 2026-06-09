@@ -15,11 +15,21 @@ ROOT = Path(__file__).resolve().parents[3]
 # Dados
 DATA = ROOT / "data"
 DATA_RAW = DATA / "raw"
+DATA_INTERIM = DATA / "interim"
 DATA_PROCESSED = DATA / "processed"
 
 # Arquivos de dados usados pela familia sonora
 DF_RECOMMENDER = DATA_PROCESSED / "df_recommender.csv"
-DF_FAMILIA_SONORA = DATA_PROCESSED / "df_familia_sonora.csv"
+# Saida da familia sonora fica em interim: e dado intermediario (rotulo +
+# probabilidades) que ainda sera consumido por etapas seguintes.
+DF_FAMILIA_SONORA = DATA_INTERIM / "df_familia_sonora.csv"
+# Componentes LDA de estilo (modelo do recommender), tambem intermediario.
+DF_RECOMMENDER_LDA = DATA_INTERIM / "df_recommender_a_with_lda.csv"
+
+# Tabela final do recommender: junta df_recommender + LDA + familia sonora
+# numa unica tabela por ID_ARTISTA. Gerada por data/make_dataset.py e
+# consumida diretamente por models/predict.py (sem merges em runtime).
+DF_FINAL = DATA_PROCESSED / "df_final.csv"
 
 # Artefatos de modelo (pipelines treinados em .joblib)
 MODELS = ROOT / "models"

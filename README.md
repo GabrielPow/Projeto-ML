@@ -6,7 +6,7 @@
 **Python:** 3.12
 
 ## Equipe
-**Membros:** Gabriel Pow; Pedro Pintor  
+**Membros:** Gabriel Pow; Pedro Pintor, Matheus Okamura  
 **E-mails:** gabriel.pow2@gmail.com; pedro20pintor@gmail.com
 
 

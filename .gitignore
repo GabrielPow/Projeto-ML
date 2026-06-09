@@ -27,7 +27,7 @@ desktop.ini
 
 # Dados (reproduziveis por codigo - configs/get_dfMain.py e models/train.py)
 data/raw/
-data/processed/
+
 
 # Imagens soltas na raiz (prints colados por engano)
 /image*.png
